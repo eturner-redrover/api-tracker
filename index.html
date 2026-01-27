@@ -405,7 +405,14 @@
     async function loadData() {
       try {
         const alerts = document.getElementById('alerts');
-        alerts.innerHTML = '';
+        
+        // Load cached data immediately if available
+        const cachedData = localStorage.getItem('apiTrackerData');
+        if (cachedData) {
+          const data = JSON.parse(cachedData);
+          updateStats(data);
+          renderChart(data);
+        }
 
         // Replace with your Cloudflare Worker URL
         const workerUrl = 'https://api-tracker.eturner-6f6.workers.dev';
@@ -418,12 +425,20 @@
         const data = await response.json();
         
         if (data.length === 0) {
-          alerts.innerHTML = '<div class="error">No data collected yet. Please wait for the first scheduled check.</div>';
+          if (!cachedData) {
+            alerts.innerHTML = '<div class="error">No data collected yet. Please wait for the first scheduled check.</div>';
+          }
           return;
         }
 
+        // Cache the data
+        localStorage.setItem('apiTrackerData', JSON.stringify(data));
+        localStorage.setItem('apiTrackerLastUpdate', new Date().toISOString());
+
+        // Update display with fresh data
         updateStats(data);
         renderChart(data);
+        alerts.innerHTML = '';
 
         // Update last updated time
         const now = new Date();
@@ -432,8 +447,13 @@
 
       } catch (error) {
         console.error('Error loading data:', error);
-        document.getElementById('alerts').innerHTML = 
-          `<div class="error">Error loading data: ${error.message}</div>`;
+        
+        // Show error only if no cached data
+        const cachedData = localStorage.getItem('apiTrackerData');
+        if (!cachedData) {
+          document.getElementById('alerts').innerHTML = 
+            `<div class="error">Error loading data: ${error.message}</div>`;
+        }
       }
     }
 
@@ -562,6 +582,19 @@
 
     // Check authentication on page load
     checkAuth();
+
+    // Load initial data with cache
+    (function() {
+      loadData();
+      
+      // Update last updated time from cache
+      const lastUpdate = localStorage.getItem('apiTrackerLastUpdate');
+      if (lastUpdate) {
+        const date = new Date(lastUpdate);
+        document.getElementById('lastUpdated').textContent = 
+          `Last updated: ${date.toLocaleTimeString()} on ${date.toLocaleDateString()} (cached)`;
+      }
+    })();
 
     // Refresh data every 5 minutes
     setInterval(loadData, 5 * 60 * 1000);
