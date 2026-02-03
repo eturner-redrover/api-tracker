@@ -459,13 +459,31 @@
 
     function updateStats(data) {
       // Today's usage
-      const today = new Date().toISOString().split('T')[0];
+      // Use CST timezone to match backend (HubSpot resets at 9 AM CST)
+      function getTodayInCST() {
+        const now = new Date();
+        const cstOffset = -6 * 60;
+        const cstTime = new Date(now.getTime() + (cstOffset * 60 * 1000) + (now.getTimezoneOffset() * 60 * 1000));
+        if (cstTime.getHours() < 9) {
+          cstTime.setDate(cstTime.getDate() - 1);
+        }
+        return cstTime.toISOString().split('T')[0];
+      }
+      const today = getTodayInCST();
       const todayData = data.find(d => d.date === today);
       
-      if (todayData) {
-        document.getElementById('todayUsage').textContent = todayData.callsUsed.toLocaleString();
+      // Fall back to most recent data if today's isn't available
+      const latestData = data.length > 0 ? data[data.length - 1] : null;
+      const displayData = todayData || latestData;
+      
+      if (displayData) {
+        document.getElementById('todayUsage').textContent = displayData.callsUsed.toLocaleString();
         document.getElementById('todayLimit').textContent = 
-          `of ${todayData.dailyLimit.toLocaleString()} daily limit`;
+          `of ${displayData.dailyLimit.toLocaleString()} daily limit`;
+        if (!todayData && latestData) {
+          document.querySelector('.stat-card .stat-label').textContent = 
+            'Latest (' + new Date(latestData.date).toLocaleDateString() + ')';
+        }
       }
 
       // 90-day average
@@ -513,68 +531,47 @@
               label: 'API Calls Used',
               data: values,
               borderColor: '#667eea',
-              backgroundColor: 'rgba(102, 126, 234, 0.1)',
-              borderWidth: 3,
-              fill: true,
-              tension: 0.4,
-              pointRadius: 4,
-              pointBackgroundColor: '#667eea',
-              pointBorderColor: '#fff',
-              pointBorderWidth: 2,
-              pointHoverRadius: 6,
-            },
-            {
-              label: 'Daily Limit',
-              data: limits,
-              borderColor: '#ccc',
               borderWidth: 2,
               fill: false,
-              borderDash: [5, 5],
+              tension: 0.3,
               pointRadius: 0,
-              tension: 0.4,
+              pointHoverRadius: 6,
+              pointHoverBackgroundColor: '#667eea',
+              pointHoverBorderColor: '#fff',
+              pointHoverBorderWidth: 2,
             },
           ],
         },
         options: {
           responsive: true,
           maintainAspectRatio: true,
+          interaction: {
+            intersect: false,
+            mode: 'index',
+          },
           plugins: {
             legend: {
-              display: true,
-              position: 'top',
-              labels: {
-                usePointStyle: true,
-                padding: 15,
-                font: { size: 12 },
-              },
+              display: false,
             },
             tooltip: {
               backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              padding: 12,
-              titleFont: { size: 14 },
+              padding: 10,
+              titleFont: { size: 13 },
               bodyFont: { size: 13 },
-              displayColors: true,
+              displayColors: false,
               callbacks: {
+                title: function(context) {
+                  return context[0].label;
+                },
                 label: function(context) {
-                  let label = context.dataset.label || '';
-                  if (label) {
-                    label += ': ';
-                  }
-                  label += context.parsed.y.toLocaleString();
-                  return label;
+                  return context.parsed.y.toLocaleString() + ' calls';
                 }
               }
             },
           },
           scales: {
-            y: {
-              beginAtZero: true,
-              ticks: {
-                callback: function(value) {
-                  return value.toLocaleString();
-                }
-              }
-            },
+            y: { display: false },
+            x: { display: false },
           },
         },
       });
