@@ -594,8 +594,8 @@
       loadData();
     })();
 
-    // Refresh data every 5 minutes
-    setInterval(loadData, 5 * 60 * 1000);
+    // Refresh data every 8 hours
+    setInterval(loadData, 8 * 60 * 60 * 1000);
 
     // Allow Enter key to authenticate
     document.addEventListener('keypress', function(event) {
