@@ -1,0 +1,14 @@
+name = "api-tracker"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+account_id = "6f64160adbe061f6af8f8a69d57a54ab"
+
+# KV Namespace binding
+[[kv_namespaces]]
+binding = "USAGE_DATA"
+id = "ab4cbe50c1d04c1aa0237b3a42da9a8e"
+
+# Scheduled trigger - runs once daily at 8:55 AM CST (14:55 UTC)
+# This captures the day's usage just before HubSpot resets at 9 AM CST
+[triggers]
+crons = ["55 14 * * *"]

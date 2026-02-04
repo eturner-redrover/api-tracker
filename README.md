@@ -25,21 +25,23 @@ https://api-tracker.eturner-6f6.workers.dev
 3. Give it scope: `crm.objects.contacts.read` (minimal permissions)
 4. Copy your **Private App Token**
 
-### 2. Setup Automatic Tracking (Every 30 Minutes)
+### 2. Setup Daily Tracking (Once per Day at End of HubSpot's API Day)
 
-Choose one:
+The tracker captures usage once daily at 8:55 AM CST (just before HubSpot resets at 9 AM). This minimizes KV writes while capturing the full day's usage.
 
-#### ✨ Option A: EasyCron.com (Easiest)
-1. Go to [easycron.com](https://www.easycron.com)
-2. Sign up (free)
-3. Click "Add a Cron Job"
-4. Enter:
-   - **URL**: `https://api-tracker.eturner-6f6.workers.dev/sync?key=YOUR_HUBSPOT_KEY`
-   - **HTTP Method**: POST
-   - **Schedule**: Every 30 minutes
-5. Save and enable
+#### ✨ Option A: Cloudflare Scheduled Trigger (Recommended)
 
-#### Option B: GitHub Actions (No extra account needed)
+1. Set your HubSpot key as a secret:
+   ```bash
+   wrangler secret put HUBSPOT_KEY
+   ```
+2. Deploy with the built-in cron trigger:
+   ```bash
+   wrangler deploy
+   ```
+3. Done! The worker will automatically capture usage daily.
+
+#### Option B: GitHub Actions
 1. Create a new GitHub repository
 2. Go to **Settings → Secrets and variables → Actions**
 3. Add two secrets:
@@ -47,28 +49,36 @@ Choose one:
    - `HUBSPOT_KEY`: Your HubSpot Private App token
 4. Create `.github/workflows/track-api.yml`:
 ```yaml
-name: Track HubSpot API Usage
+name: Capture Daily HubSpot API Usage
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    # Runs at 8:55 AM CST (14:55 UTC) - just before HubSpot resets at 9 AM CST
+    - cron: '55 14 * * *'
 jobs:
-  track:
+  capture:
     runs-on: ubuntu-latest
     steps:
-      - name: Track API Usage
+      - name: Capture Daily Usage
         run: |
-          curl -X POST "${{ secrets.WORKER_URL }}/sync?key=${{ secrets.HUBSPOT_KEY }}"
+          curl -X POST "${{ secrets.WORKER_URL }}/daily-capture?key=${{ secrets.HUBSPOT_KEY }}"
 ```
 5. Push to GitHub
+
+#### Option C: EasyCron
+1. Go to [easycron.com](https://www.easycron.com)
+2. Add a cron job:
+   - **URL**: `https://api-tracker.eturner-6f6.workers.dev/daily-capture?key=YOUR_HUBSPOT_KEY`
+   - **HTTP Method**: POST
+   - **Schedule**: `55 14 * * *` (8:55 AM CST / 2:55 PM UTC)
 
 ### 3. Test It Works
 
 Replace `YOUR_HUBSPOT_KEY`:
 ```bash
-curl -X POST "https://api-tracker.eturner-6f6.workers.dev/sync?key=YOUR_HUBSPOT_KEY"
+curl -X POST "https://api-tracker.eturner-6f6.workers.dev/daily-capture?key=YOUR_HUBSPOT_KEY"
 ```
 
-Should respond with: `Synced`
+Should respond with: `Daily usage captured`
 
 ### 4. Host Your Dashboard
 
@@ -91,17 +101,19 @@ Just upload `index.html` anywhere
 
 ## API Endpoints
 
-- `GET /data` → Get 90 days of usage data (JSON)
-- `GET /current` → Get today's usage (JSON)
-- `POST /sync?key=YOUR_HUBSPOT_KEY` → Manually capture usage
+- `GET /data` → Get 90 days of historical usage data (JSON)
+- `GET /current?key=YOUR_KEY` → Get current live usage without writing to KV (JSON)
+- `POST /daily-capture?key=YOUR_KEY` → Capture daily usage to KV (call once per day)
+- `POST /sync?key=YOUR_KEY` → Legacy endpoint (same as daily-capture)
 
 ## How It Works
 
-1. Every 30 minutes, your cron service POSTs to `/sync`
-2. The Cloudflare Worker calls HubSpot API
-3. It reads the rate limit headers to determine usage
-4. Stores the daily total in KV storage
-5. Your dashboard fetches and visualizes the data
+1. Once daily at 8:55 AM CST, the scheduled trigger runs
+2. The Cloudflare Worker calls HubSpot API to check rate limit headers
+3. It stores the day's total usage in KV storage (1 write per day)
+4. Your dashboard fetches and visualizes the 90-day history
+
+**Why once daily?** Cloudflare KV free tier has write limits. Capturing once daily (vs every 30 min) keeps you well within free tier limits.
 
 ## Data Structure
 
