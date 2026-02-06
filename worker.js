@@ -74,9 +74,9 @@ export default {
   // Scheduled trigger - runs once daily at end of HubSpot's API day
   // HubSpot resets at 9 AM CST, so we capture at 8:55 AM CST (before reset)
   async scheduled(event, env, ctx) {
-    const hubspotKey = env.HUBSPOT_KEY;
+    const hubspotKey = env.HUBSPOT_API_KEY;
     if (!hubspotKey) {
-      console.error('HUBSPOT_KEY environment variable not set');
+      console.error('HUBSPOT_API_KEY environment variable not set');
       return;
     }
     
